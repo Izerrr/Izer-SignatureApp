@@ -37,11 +37,13 @@ export default function SignaturePage() {
     recordTimerRef.current = requestAnimationFrame(tickProgress);
 
     try {
-      const blob = await recordCanvasAsVideo(sig.canvasRef.current, {
+      // Disederhanakan: langsung kirim canvas, strokes, dan object konfigurasi saja
+      const blob = await recordCanvasAsVideo(sig.canvasRef.current, sig.getStrokes(), {
         fps: 24,
         maxDurationMs: MAX_RECORD_MS,
         bitsPerSecond: 400000,
       });
+
       cancelAnimationFrame(recordTimerRef.current);
       setPhase("uploading");
       await submitSignature({ nama: nama.trim(), kelas: kelas.trim(), blob });
@@ -51,7 +53,7 @@ export default function SignaturePage() {
       setError(err.message || "Terjadi kesalahan. Coba lagi.");
       setPhase("form");
     }
-  }, [canSubmit, sig.canvasRef, nama, kelas, tickProgress]);
+  }, [canSubmit, sig.canvasRef, sig.getStrokes, nama, kelas, tickProgress]);
 
   const handleReset = useCallback(() => {
     setNama("");
@@ -91,12 +93,7 @@ export default function SignaturePage() {
             transition-all duration-200 overflow-hidden
             ${canSubmit ? "bg-ink text-paper hover:bg-slate active:scale-[0.98]" : "bg-hairline text-muted/60 cursor-not-allowed"}`}
         >
-          {phase === "recording" && (
-            <span
-              className="absolute inset-0 bg-moss/90 origin-left transition-transform duration-100 ease-linear"
-              style={{ transform: `scaleX(${recordProgress})` }}
-            />
-          )}
+          {phase === "recording" && <span className="absolute inset-0 bg-moss/90 origin-left transition-transform duration-100 ease-linear" style={{ transform: `scaleX(${recordProgress})` }} />}
           <span className="relative flex items-center gap-2.5">
             {phase === "recording" ? (
               <>
@@ -112,9 +109,7 @@ export default function SignaturePage() {
           </span>
         </button>
 
-        <p className="text-center text-[12px] text-muted/70 -mt-3">
-          Video singkat (maks. 8 detik) akan dibuat otomatis dari tanda tanganmu.
-        </p>
+        <p className="text-center text-[12px] text-muted/70 -mt-3">Video singkat (maks. 8 detik) akan dibuat otomatis dari tanda tanganmu.</p>
       </main>
 
       {phase === "uploading" && <LoadingOverlay label="Mengunggah video…" />}

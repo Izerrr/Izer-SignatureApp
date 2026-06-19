@@ -13,7 +13,7 @@ const STROKE_WIDTH = 3;
  * - smooth pointer-driven drawing via requestAnimationFrame
  * - stroke-level undo stack (not pixel diffing, so it's cheap)
  * - background toggle (paper white vs chroma key green)
- * - lightweight MediaRecorder-based video export
+ * - lightweight MediaRecorder-based video export with write-on motion
  */
 export function useSignatureCanvas() {
   const canvasRef = useRef(null);
@@ -53,7 +53,7 @@ export function useSignatureCanvas() {
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     },
-    [bgColor]
+    [bgColor],
   );
 
   // Redraw every committed stroke from scratch (cheap: signatures are short-lived).
@@ -114,7 +114,6 @@ export function useSignatureCanvas() {
   }, []);
 
   // rAF loop: drains the latest pointer position and draws incrementally.
-  // This decouples drawing from the (potentially high-frequency) pointer event rate.
   const tick = useCallback(() => {
     const ctx = getCtx();
     const pending = pendingPointRef.current;
@@ -145,7 +144,7 @@ export function useSignatureCanvas() {
       currentStrokeRef.current = [point];
       rafRef.current = requestAnimationFrame(tick);
     },
-    [getPointFromEvent, tick]
+    [getPointFromEvent, tick],
   );
 
   const moveDraw = useCallback(
@@ -155,7 +154,7 @@ export function useSignatureCanvas() {
       const point = getPointFromEvent(e);
       if (point) pendingPointRef.current = point;
     },
-    [getPointFromEvent]
+    [getPointFromEvent],
   );
 
   const endDraw = useCallback(() => {
@@ -209,27 +208,27 @@ export function useSignatureCanvas() {
     startDraw,
     moveDraw,
     endDraw,
+    getStrokes: () => strokesRef.current, // Untuk mensuplai titik koordinat ke recorder animasinya
   };
 }
 
 /**
- * Records a fixed-duration clip of the canvas as a lightweight WebM video.
- * - 24fps capture, 400kbps bitrate target → keeps files well under 1MB for short clips
- * - Hard-capped duration prevents runaway recordings
+ * Records a fixed-duration clip of the canvas as a lightweight WebM video with an automated write-on effect.
  */
-export function recordCanvasAsVideo(canvas, { fps = 24, maxDurationMs = 8000, bitsPerSecond = 400000 } = {}) {
+export function recordCanvasAsVideo(canvas, strokes, { fps = 24, maxDurationMs = 8000, bitsPerSecond = 400000 } = {}) {
   return new Promise((resolve, reject) => {
     if (!canvas || typeof canvas.captureStream !== "function") {
       reject(new Error("captureStream tidak didukung di browser ini."));
       return;
     }
 
+    // KUNCI WARNA HIJAU CHROMA DI SINI
+    const CHROMA_GREEN = "#00FF00";
+    const STROKE_COLOR = "#0A0A0C";
+    const STROKE_WIDTH = 3;
+
     const stream = canvas.captureStream(fps);
-    const mimeCandidates = [
-      "video/webm;codecs=vp9",
-      "video/webm;codecs=vp8",
-      "video/webm",
-    ];
+    const mimeCandidates = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
     const mimeType = mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m)) || "video/webm";
 
     let recorder;
@@ -251,8 +250,84 @@ export function recordCanvasAsVideo(canvas, { fps = 24, maxDurationMs = 8000, bi
       resolve(blob);
     };
 
+    const ctx = canvas.getContext("2d");
+    const startTime = Date.now();
+    const animationDuration = 2500;
+    let rafId;
+
+    function drawStrokePath(ctx, points) {
+      if (points.length < 2) {
+        if (points.length === 1) {
+          ctx.beginPath();
+          ctx.arc(points[0].x, points[0].y, STROKE_WIDTH / 2, 0, Math.PI * 2);
+          ctx.fillStyle = STROKE_COLOR;
+          ctx.fill();
+        }
+        return;
+      }
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length - 1; i++) {
+        const midX = (points[i].x + points[i + 1].x) / 2;
+        const midY = (points[i].y + points[i + 1].y) / 2;
+        ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+      }
+      ctx.stroke();
+    }
+
+    function recordTick() {
+      const elapsed = Date.now() - startTime;
+
+      // Paksa warna background menjadi HIJAU CHROMA di setiap frame video
+      ctx.fillStyle = CHROMA_GREEN;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const progress = Math.min(1, elapsed / animationDuration);
+
+      let totalPoints = 0;
+      strokes.forEach((s) => (totalPoints += s.length));
+      const pointsToDraw = Math.floor(totalPoints * progress);
+
+      let pointsCounted = 0;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = STROKE_WIDTH;
+      ctx.strokeStyle = STROKE_COLOR;
+
+      for (const stroke of strokes) {
+        if (pointsCounted >= pointsToDraw) break;
+        const remaining = pointsToDraw - pointsCounted;
+
+        if (remaining >= stroke.length) {
+          drawStrokePath(ctx, stroke);
+          pointsCounted += stroke.length;
+        } else {
+          const partialStroke = stroke.slice(0, remaining);
+          drawStrokePath(ctx, partialStroke);
+          pointsCounted += remaining;
+          break;
+        }
+      }
+
+      if (progress >= 1) {
+        ctx.fillStyle = CHROMA_GREEN;
+        ctx.fillRect(canvas.width - 1, canvas.height - 1, 1, 1);
+      }
+
+      if (elapsed < maxDurationMs) {
+        rafId = requestAnimationFrame(recordTick);
+      }
+    }
+
+    // Warnai hijau tepat sebelum record dimulai agar keyframe pertama bernilai hijau
+    ctx.fillStyle = CHROMA_GREEN;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     recorder.start();
+    rafId = requestAnimationFrame(recordTick);
+
     setTimeout(() => {
+      cancelAnimationFrame(rafId);
       if (recorder.state !== "inactive") recorder.stop();
     }, maxDurationMs);
   });
