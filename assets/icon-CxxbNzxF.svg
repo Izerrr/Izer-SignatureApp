@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Background Squircle Premium ala iOS -->
+  <rect width="512" height="512" rx="140" fill="#0A0A0C" />
+  
+  <!-- Efek Subtle Glow Internal Ring -->
+  <rect x="12" y="12" width="488" height="488" rx="128" fill="none" stroke="#27272A" stroke-width="2" opacity="0.5"/>
+
+  <!-- Gradasi untuk Goresan Tanda Tangan -->
+  <defs>
+    <linearGradient id="izerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="60%" stop-color="#E4E4E7" />
+      <stop offset="100%" stop-color="#A1A1AA" />
+    </linearGradient>
+  </defs>
+
+  <!-- Simbol Utama: Kombinasi Pen Tip, Huruf 'I', dan Play Path -->
+  <g transform="translate(32, 24)">
+    <!-- Alur Garis TTD Elegan -->
+    <path d="M 120 320 
+             C 180 320, 240 160, 210 120 
+             C 170 70, 120 200, 200 280 
+             C 260 340, 320 200, 350 140 
+             L 360 120" 
+          fill="none" 
+          stroke="url(#izerGradient)" 
+          stroke-width="28" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+          
+    <!-- Titik Presisi Logika Engine (Membentuk Huruf I) -->
+    <circle cx="210" cy="50" r="18" fill="#FFFFFF" />
+    
+    <!-- Subtly hidden: Aset Segitiga Play Indikator Recording di Ujung Garis -->
+    <polygon points="345,155 375,120 380,165" fill="#FFFFFF" />
+  </g>
+</svg>

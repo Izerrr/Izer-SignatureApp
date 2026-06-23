@@ -1,0 +1,15 @@
+{
+  "name": "Izer's Signature Engine",
+  "short_name": "IzerSig",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#1D1D1F",
+  "background_color": "#F5F5F7",
+  "display": "standalone",
+  "start_url": "."
+}
